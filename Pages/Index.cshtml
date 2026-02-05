@@ -1,0 +1,135 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Voice + Gemini POC";
+}
+
+<div class="container" style="max-width: 800px; padding-top: 20px;">
+    <div class="row">
+        <div class="col-md-5">
+            <h4 class="mb-3">⚙️ Config</h4>
+            <div class="card p-3 mb-3 bg-light">
+                <small class="text-muted">Twilio Creds</small>
+                <input type="text" id="accSid" class="form-control form-control-sm mb-2" placeholder="Account SID (AC...)" value="@Model.TwilioAccountSID" />
+                <input type="text" id="apiKey" class="form-control form-control-sm mb-2" placeholder="API Key (SK...)" value="@Model.TwilioAPIKey" />
+                <input type="password" id="apiSecret" class="form-control form-control-sm mb-2" placeholder="API Secret" value="@Model.TwilioAPISecret" />
+                <input type="text" id="appSid" class="form-control form-control-sm mb-2" placeholder="TwiML App SID (AP...)" value="@Model.TwilioAppID" />
+
+                <small class="text-muted mt-2">Gemini AI</small>
+                <input type="password" id="geminiKey" class="form-control form-control-sm mb-2" placeholder="Gemini API Key" value="@Model.GeminiAPIKey" />
+
+                <button onclick="initializeDevice()" class="btn btn-primary btn-sm w-100">Initialize Device</button>
+                <div id="status" class="text-success mt-2 small"></div>
+            </div>
+
+            <h4 class="mb-3">📞 Phone</h4>
+            <div class="card p-3">
+                <input type="text" id="callerId" class="form-control mb-2" placeholder="From: +1555..." value="@Model.FromPhoneNumber" />
+                <input type="text" id="phoneNumber" class="form-control mb-2" placeholder="To: +1..." value="@Model.ToPhoneNumber" />
+                <button id="btnCall" onclick="makeCall()" class="btn btn-success" disabled>Call Number</button>
+                <button id="btnHangup" onclick="hangUp()" class="btn btn-danger" style="display:none;">Hang Up</button>
+            </div>
+        </div>
+
+        <div class="col-md-7">
+            <h4 class="mb-3">🤖 AI Analysis</h4>
+            <div id="results-area">
+                <div class="alert alert-secondary text-center">No calls processed yet.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@@twilio/voice-sdk@2.11.0/dist/twilio.min.js"></script>
+
+<script>
+    let device;
+    let activeCall;
+    let pollingInterval;
+
+    // --- TWILIO LOGIC ---
+    async function initializeDevice() {
+        if (typeof Twilio === 'undefined') { alert("SDK Error"); return; }
+
+        const data = {
+            accountSid: document.getElementById('accSid').value,
+            apiKey: document.getElementById('apiKey').value,
+            apiSecret: document.getElementById('apiSecret').value,
+            twimlAppSid: document.getElementById('appSid').value
+        };
+
+        try {
+            const resp = await fetch('/token', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)});
+            const json = await resp.json();
+            device = new Twilio.Device(json.token);
+            await device.register();
+            document.getElementById('status').innerText = "System Online";
+            document.getElementById('btnCall').disabled = false;
+        } catch(e) { alert(e); }
+    }
+
+    async function makeCall() {
+        if (!device) return;
+
+        const params = {
+            To: document.getElementById('phoneNumber').value,
+            CallerId: document.getElementById('callerId').value,
+            GeminiKey: document.getElementById('geminiKey').value,
+
+            // --- NEW: Pass credentials so the server can download the recording ---
+            TwilioApiKey: document.getElementById('apiKey').value,
+            TwilioApiSecret: document.getElementById('apiSecret').value
+        };
+
+        activeCall = await device.connect({ params: params });
+
+        document.getElementById('btnCall').style.display = 'none';
+        document.getElementById('btnHangup').style.display = 'inline-block';
+
+        activeCall.on('disconnect', () => {
+            document.getElementById('btnCall').style.display = 'inline-block';
+            document.getElementById('btnHangup').style.display = 'none';
+            startPolling();
+        });
+    }
+
+    function hangUp() { if (activeCall) activeCall.disconnect(); }
+
+    // --- POLLING LOGIC ---
+    
+    function startPolling() {
+        if(pollingInterval) clearInterval(pollingInterval);
+        pollingInterval = setInterval(loadResults, 2000); // Check every 2s
+    }
+
+    async function loadResults() {
+        const resp = await fetch('/calls');
+        const calls = await resp.json();
+
+        const container = document.getElementById('results-area');
+        if (calls.length === 0) return;
+
+        container.innerHTML = calls.map(c => `
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header d-flex justify-content-between">
+                    <strong>${new Date(c.timestamp).toLocaleTimeString()}</strong>
+                    <span class="badge bg-${c.status === 'Completed' ? 'success' : 'warning'}">${c.status}</span>
+                </div>
+                <div class="card-body">
+                    ${c.recordingUrl ? `<audio controls src="${c.recordingUrl}.mp3" class="w-100 mb-2"></audio>` : ''}
+                    ${c.status === 'Completed' ? `
+                        <h6 class="text-primary">Gemini Response:</h6>
+                        <div style="white-space: pre-wrap; background: #f8f9fa; padding: 10px; border-radius: 5px;">${c.aiResponse}</div>
+                    ` : '<div class="spinner-border spinner-border-sm"></div> Processing AI...'}
+                </div>
+            </div>
+        `).join('');
+
+        // If the most recent call is Completed or has an Error, stop checking.
+        const latestCall = calls[0]; // Assuming server sorts by descending timestamp
+        if (latestCall.status === 'Completed' || latestCall.status.startsWith('Error')) {
+            clearInterval(pollingInterval);
+            document.getElementById('status').innerText = "Status: Idle";
+        }
+    }
+</script>
