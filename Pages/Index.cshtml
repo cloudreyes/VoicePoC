@@ -116,7 +116,9 @@
                     <span class="badge bg-${c.status === 'Completed' ? 'success' : 'warning'}">${c.status}</span>
                 </div>
                 <div class="card-body">
-                    ${c.recordingUrl ? `<audio controls src="${c.recordingUrl}.mp3" class="w-100 mb-2"></audio>` : ''}
+                    ${c.recordingUrl ? `
+                        <audio controls src="/recording-proxy?url=${encodeURIComponent(c.recordingUrl)}&ak=${encodeURIComponent(document.getElementById('apiKey').value)}&as=${encodeURIComponent(document.getElementById('apiSecret').value)}" class="w-100 mb-2"></audio>
+                    ` : ''}
                     ${c.status === 'Completed' ? `
                         <h6 class="text-primary">Gemini Response:</h6>
                         <div style="white-space: pre-wrap; background: #f8f9fa; padding: 10px; border-radius: 5px;">${c.aiResponse}</div>

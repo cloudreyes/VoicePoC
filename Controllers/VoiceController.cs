@@ -9,7 +9,8 @@ namespace VoicePoC.Controllers;
 public class VoiceController(
     ITwilioService twilioService, 
     IAIService aiService, 
-    ICallStorageService storageService) : ControllerBase
+    ICallStorageService storageService,
+    IHttpClientFactory clientFactory) : ControllerBase
 {
     [HttpPost("/token")]
     public IActionResult GetToken([FromBody] TokenRequest req)
@@ -55,6 +56,26 @@ public class VoiceController(
         });
 
         return Ok();
+    }
+
+    [HttpGet("/recording-proxy")]
+    public async Task<IActionResult> ProxyRecording([FromQuery] string url, [FromQuery] string ak, [FromQuery] string @as)
+    {
+        if (string.IsNullOrEmpty(url)) return BadRequest("URL is required");
+
+        var httpClient = clientFactory.CreateClient();
+        var authToken = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"{ak}:{@as}"));
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authToken);
+
+        var audioUrl = url.EndsWith(".mp3") ? url : url + ".mp3";
+        var response = await httpClient.GetAsync(audioUrl, HttpCompletionOption.ResponseHeadersRead);
+
+        if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+
+        var contentType = response.Content.Headers.ContentType?.ToString() ?? "audio/mpeg";
+        var stream = await response.Content.ReadAsStreamAsync();
+
+        return File(stream, contentType);
     }
 
     [HttpGet("/calls")]
