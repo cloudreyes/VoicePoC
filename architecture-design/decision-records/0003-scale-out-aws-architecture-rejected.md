@@ -1,7 +1,7 @@
 ﻿# ADR 0003: High-Scale AWS Deployment Architecture
 
 ## Status
-Proposed
+Rejected - Superseded by ADR 0004
 
 ## Context
 The current VoicePoC is designed for rapid development with in-memory storage and local configuration. To transition to a production-grade, high-scale, and high-performance system on AWS, we need to address several limitations:

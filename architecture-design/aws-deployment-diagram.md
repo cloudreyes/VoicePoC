@@ -1,6 +1,6 @@
-﻿# AWS Target Architecture Diagram
+﻿# AWS Target Architecture Diagram (Minimal)
 
-This diagram illustrates the proposed high-scale architecture for deploying VoicePoC to AWS.
+This diagram illustrates the proposed minimal AWS deployment for VoicePoC per ADR 0004.
 
 ```mermaid
 graph TD
@@ -9,18 +9,19 @@ graph TD
         Users[Web Users]
     end
 
-    subgraph "AWS Cloud"
+    subgraph "AWS Cloud (Region A)"
         ALB[Application Load Balancer]
         
         subgraph "Auto Scaling Group (EC2)"
-            Web[Web App Instances]
+            Web[Web App Instances (Linux)]
         end
 
-        SM[AWS Secrets Manager]
-        SQS[Amazon SQS - AI Task Queue]
-        S3[Amazon S3 - Audio/Transcripts]
-        SNS[Amazon SNS - Call Events]
-        RDS[(Amazon RDS - Postgres)]
+        S3[Amazon S3 - Recordings]
+        RDS[(Amazon RDS - Postgres Primary)]
+    end
+
+    subgraph "AWS Cloud (Region B)"
+        RDSReplica[(RDS Postgres Read Replica)]
     end
 
     subgraph "AI / 3rd Party"
@@ -33,25 +34,15 @@ graph TD
     PSTN -- "Webhooks" --> ALB
     ALB -- "Route Requests" --> Web
     
-    Web -- "Fetch Secrets" --> SM
-    Web -- "Enqueue AI Task" --> SQS
-    
-    SQS -- "Trigger Processing" --> Web
-    
     Web -- "Download Recording" --> Twilio
     Web -- "Analyze" --> Gemini
-    Web -- "Store Blob" --> S3
+    Web -- "Store Recording" --> S3
     
-    Web -- "Publish Result" --> SNS
-    SNS -- "Notify" --> RDS
-    
-    RDS -- "Read History" --> Web
+    Web -- "Read/Write Metadata" --> RDS
+    RDS -- "Logical Replication" --> RDSReplica
 ```
 
-### Key Architectural Patterns for High Scale
-
-1.  **Queue-Based Load Leveling**: By placing **SQS** between the webhook and the AI processing, we ensure that a sudden burst of calls doesn't overwhelm the AI service or our own compute resources. It also provides automatic retries.
-2.  **Stateless Compute**: Moving data to **RDS** and **S3** allows the EC2 instances to be terminated and replaced at any time by the **Auto Scaling Group** without data loss.
-3.  **Secrets Management**: **AWS Secrets Manager** removes the need for `appsettings.json` secrets, providing better rotation and auditability.
-4.  **Pub/Sub (SNS)**: Decoupling the "completion" of a call from the "storage" in RDS allows for future extensions (e.g., sending an email, updating a dashboard) without modifying the core AI logic.
-5.  **Database Scalability**: **RDS Postgres** supports read replicas, which can be used to scale out the "Get History" functionality if user traffic grows significantly.
+### Notes
+- Minimal changes to the app: replace in-memory storage with Postgres and store recordings in S3.
+- No SQS/SNS/Redis at this stage; can be introduced later if needed.
+- Cross-region read replica is for DR; application uses the primary RDS in normal operation.
