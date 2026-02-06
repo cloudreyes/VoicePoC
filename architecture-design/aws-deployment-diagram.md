@@ -13,7 +13,7 @@ graph TD
         ALB[Application Load Balancer]
         
         subgraph "Auto Scaling Group (EC2)"
-            Web[Web App Instances (Linux)]
+            Web["Web App Instances (Linux)"]
         end
 
         S3[Amazon S3 - Recordings]
