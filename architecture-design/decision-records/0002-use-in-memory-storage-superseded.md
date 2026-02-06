@@ -1,7 +1,7 @@
 ﻿# ADR 002: Use In-Memory Storage for Call Data
 
 ## Status
-Accepted
+Superseded by ADR 0004
 
 ## Context
 The application needs to store call metadata and state during and after the call lifecycle for the dashboard and processing.

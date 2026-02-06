@@ -1,7 +1,7 @@
 ﻿# ADR 0004: Minimal AWS Deployment Architecture (ALB + EC2 + RDS + S3)
 
 ## Status
-Proposed
+Approved
 
 ## Context
 ADR 0003 proposed a high-scale, event-driven architecture (SQS/SNS/Redis/etc.). While powerful, it increases complexity. The current goal is to deploy with minimal application changes, keeping the runtime simple while enabling horizontal scale and basic HA.
@@ -63,4 +63,5 @@ Adopt a minimal AWS infrastructure composed of:
 - Revert to the in-memory storage implementation and local file/memory handling of recordings (for development only). For production, prefer staying with RDS/S3 due to durability.
 
 ## Links
+- Supersedes ADR 0002 (In-Memory Storage).
 - Supersedes ADR 0003 (which is now Rejected).
