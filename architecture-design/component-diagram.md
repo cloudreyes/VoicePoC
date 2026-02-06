@@ -31,9 +31,9 @@ graph TD
     VC -- "Fire & Forget" --> GS
     
     TS <--> T_API
-    GS --> T_API : "Download Recording"
-    GS --> G_API : "Analyze Audio"
-    GS --> CSS : "Update Results"
+    GS -- "Download Recording" --> T_API
+    GS -- "Analyze Audio" --> G_API
+    GS -- "Update Results" --> CSS
     
     T_API -- "Webhooks" --> VC
 ```
